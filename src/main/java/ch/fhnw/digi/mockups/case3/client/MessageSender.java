@@ -14,9 +14,11 @@ public class MessageSender {
 	@Autowired
 	private JmsTemplate jmsTemplate;
 
-	void requestJobFromDispo(JobMessage job) {
+    void requestJobFromDispo(JobMessage job) {
         JobRequestMessage request = new JobRequestMessage();
         request.setJobnumber(job.getJobnumber());
+        request.setRequestingEmployee("Mitarbeiter 1");
+
         jmsTemplate.convertAndSend("dispo.jobs.requestAssignment", request);
 		
 		// FIXME: JobRequestMessage erzeugen und an Broker schicken

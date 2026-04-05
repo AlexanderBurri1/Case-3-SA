@@ -22,10 +22,14 @@ public class MessageReceiver {
 
 
 	// FIXME: Nachrichten Empfangen und an das GUI weitergeben
+    // Fixed
     @JmsListener(destination = "dispo.jobs.new", containerFactory = "myFactory")
     public void receiveJob(JobMessage job) {
         System.out.println("Received job: " + job.getJobnumber());
-        ui.addJobToList(job);
+
+        if (job.getType() == JobMessage.JobType.Maintanence) {
+            ui.addJobToList(job);
+        }
     }
 
     @JmsListener(destination = "dispo.jobs.assignments", containerFactory = "myFactory")

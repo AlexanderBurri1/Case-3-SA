@@ -15,6 +15,10 @@ import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
+import javax.swing.JComboBox;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -34,25 +38,38 @@ public class UI extends JFrame {
 
 	private JList<String> m_list_assignments;
 	private DefaultListModel<String> m_list_assignments_model;
+    private List<JobMessage> allJobs;
 
 	private JButton m_btn_requestJob;
+    private JComboBox<String> m_regionFilter;
 
 	@PostConstruct
 	void init() {
 
-		m_list_jobs_model = new DefaultListModel<JobMessage>();
+        allJobs = new ArrayList<>();
+        m_list_jobs_model = new DefaultListModel<JobMessage>();
 		m_list_jobs = new JList<JobMessage>(m_list_jobs_model);
 
 		m_list_assignments_model = new DefaultListModel<String>();
 		m_list_assignments = new JList<String>(m_list_assignments_model);
 
 		m_btn_requestJob = new JButton("Selektierten Job anfordern");
-		m_btn_requestJob.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				acceptSelectedJob();
-			}
-		});
+        m_btn_requestJob.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+                acceptSelectedJob();
+            }
+        });
+
+        m_regionFilter = new JComboBox<>();
+        m_regionFilter.addItem("Alle");
+        m_regionFilter.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                refreshJobList();
+            }
+        });
+
 
 		JPanel rootPanel = new JPanel(new BorderLayout());
 		JPanel listsPanel = new JPanel();
@@ -71,7 +88,11 @@ public class UI extends JFrame {
 		assignmentsPanel.setMinimumSize(new Dimension(200,200));
 		listsPanel.add(jobsPanel);
 		listsPanel.add(assignmentsPanel);
-		rootPanel.add(m_btn_requestJob, BorderLayout.SOUTH);
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.add(new JLabel("Region:"));
+        bottomPanel.add(m_regionFilter);
+        bottomPanel.add(m_btn_requestJob);
+        rootPanel.add(bottomPanel, BorderLayout.SOUTH);
 		rootPanel.add(listsPanel,BorderLayout.CENTER);
 
 		
@@ -83,43 +104,84 @@ public class UI extends JFrame {
 		setVisible(true);
 	}
 
-	protected void acceptSelectedJob() {
-		JobMessage m = m_list_jobs.getSelectedValue();
-		if (m == null)
-			return;
+    protected void acceptSelectedJob() {
+        JobMessage m = m_list_jobs.getSelectedValue();
+        if (m == null)
+            return;
 
-		messageSender.requestJobFromDispo(m);
+        messageSender.requestJobFromDispo(m);
 
-	}
+        synchronized (allJobs) {
+            allJobs.remove(m);
+        }
+        refreshJobList();
+    }
 
-	public void addJobToList(JobMessage j) {
-		SwingUtilities.invokeLater(new Runnable() {
-			public void run() {
-				synchronized (m_list_jobs_model) {
-					m_list_jobs_model.add(0, j);
-				}
-			}
+    private void refreshJobList() {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                String selectedRegion = (String) m_regionFilter.getSelectedItem();
 
-		});
-	}
+                synchronized (m_list_jobs_model) {
+                    m_list_jobs_model.clear();
 
-	public void assignJob(JobAssignmentMessage c) {
-		SwingUtilities.invokeLater(new Runnable() {
-			public void run() {
-				synchronized (m_list_jobs_model) {
-					for (int x = 0; x < m_list_jobs_model.getSize(); ++x) {
-						if (m_list_jobs_model.get(x).getJobnumber().equals(c.getJobnumber())) {
-							m_list_jobs_model.remove(x);
-							break;
-						}
-					}
-				}
+                    for (JobMessage job : allJobs) {
+                        if ("Alle".equals(selectedRegion) || job.getRegion().equals(selectedRegion)) {
+                            m_list_jobs_model.addElement(job);
+                        }
+                    }
+                }
+            }
+        });
+    }
 
-				synchronized (m_list_assignments_model) {
-					m_list_assignments_model.add(0,
-							"Job " + c.getJobnumber() + " wurde an \"" + c.getAssignedEmployee() + "\" vergeben");
-				}
-			}
-		});
-	}
+    private void updateRegionFilter(JobMessage job) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                String region = job.getRegion();
+
+                for (int i = 0; i < m_regionFilter.getItemCount(); i++) {
+                    if (m_regionFilter.getItemAt(i).equals(region)) {
+                        return;
+                    }
+                }
+
+                m_regionFilter.addItem(region);
+            }
+        });
+    }
+
+    public void addJobToList(JobMessage j) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                synchronized (allJobs) {
+                    allJobs.add(0, j);
+                }
+                updateRegionFilter(j);
+                refreshJobList();
+            }
+        });
+    }
+
+    public void assignJob(JobAssignmentMessage c) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                synchronized (allJobs) {
+                    for (int x = 0; x < allJobs.size(); ++x) {
+                        if (allJobs.get(x).getJobnumber().equals(c.getJobnumber())) {
+                            allJobs.remove(x);
+                            break;
+                        }
+                    }
+                }
+
+                refreshJobList();
+
+                synchronized (m_list_assignments_model) {
+                    m_list_assignments_model.add(0,
+                            "Job " + c.getJobnumber() + " wurde an \"" + c.getAssignedEmployee() + "\" vergeben");
+                }
+            }
+        });
+    }
 }
