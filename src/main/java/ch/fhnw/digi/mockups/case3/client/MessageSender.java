@@ -15,15 +15,12 @@ public class MessageSender {
 
     void requestJobFromDispo(JobMessage job) {
 
-        // Create request message
         JobRequestMessage request = new JobRequestMessage();
         request.setJobnumber(job.getJobnumber());
         request.setRequestingEmployee("Employee X"); // can be any name
 
-        // IMPORTANT: Queue (not topic)
         jmsTemplate.setPubSubDomain(false);
 
-        // Send to correct channel
         jmsTemplate.convertAndSend("dispo.jobs.requestAssignment", request);
     }
 }

@@ -38,7 +38,7 @@ public class MessageReceiver {
         DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
         configurer.configure(factory, connectionFactory);
 
-        factory.setPubSubDomain(true); // IMPORTANT → Topic mode
+        factory.setPubSubDomain(true);
         factory.setMessageConverter(jacksonJmsMessageConverter());
 
         return factory;
